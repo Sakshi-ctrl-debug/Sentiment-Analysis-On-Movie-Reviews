@@ -1,0 +1,90 @@
+!pip install nltk pandas scikit-learn
+
+import nltk
+import pandas as pd
+import numpy as np
+from nltk.corpus import movie_reviews
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+nltk.download('movie_reviews')
+
+documents = [(list(movie_reviews.words(fileid)), category)
+             for category in movie_reviews.categories()
+             for fileid in movie_reviews.fileids(category)]
+
+np.random.shuffle(documents)
+
+texts = [" ".join(words) for words, label in documents]
+labels = [label for words, label in documents]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    texts, labels, test_size=0.25, random_state=42)
+
+vectorizer = TfidfVectorizer(max_features=5000)
+X_train_vectorized = vectorizer.fit_transform(X_train)
+X_test_vectorized = vectorizer.transform(X_test)
+
+model = MultinomialNB()
+model.fit(X_train_vectorized, y_train)
+
+y_pred = model.predict(X_test_vectorized)
+
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy * 100:.2f}%")
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+custom_reviews = [
+    "The movie was fantastic! I really enjoyed the plot and characters.",
+    "It was a boring movie with no real storyline.",
+    "Amazing direction and acting, totally loved it!",
+    "Worst movie ever. Complete waste of time."]
+
+custom_reviews_vectorized = vectorizer.transform(custom_reviews)
+custom_predictions = model.predict(custom_reviews_vectorized)
+
+for review, sentiment in zip(custom_reviews, custom_predictions):
+    print(f"Review: {review}\nSentiment: {sentiment}\n")
+
+import joblib
+# Save the vectorizer and model
+joblib.dump(vectorizer, 'tfidf_vectorizer.pkl')
+joblib.dump(model, 'sentiment_model.pkl')
+
+
+!pip install transformers datasets
+from transformers import pipeline
+from datasets import load_dataset
+classifier = pipeline("sentiment-analysis")
+reviews = [
+    "This movie was absolutely amazing! The acting was superb and the plot was captivating.",
+    "I hated this movie. The story was boring and the characters were unrelatable.",
+    "It was an okay movie, nothing special.",
+    "A truly phenomenal cinematic experience!",
+    "A complete waste of time."]
+
+results = classifier(reviews)
+
+for review, result in zip(reviews, results):
+  print(f"Review: {review}")
+  print(f"Sentiment: {result['label']}, Confidence Score: {result['score']}")
+  print("-" * 50)
+
+try:
+    imdb_dataset = load_dataset("imdb", split="test")
+    sample_reviews = [imdb_dataset[i]['text'] for i in range(5)]
+    sample_results = classifier(sample_reviews)
+    for review, result in zip(sample_reviews, sample_results):
+        print(f"Review: {review[:100]}...")
+        print(f"Sentiment: {result['label']}, Confidence Score: {result['score']}")
+        print("-" * 50)
+except Exception as e:
+    print(f"Error loading or processing imdb dataset: {e}")
+    print("Make sure you have an internet connection to download the dataset.")
